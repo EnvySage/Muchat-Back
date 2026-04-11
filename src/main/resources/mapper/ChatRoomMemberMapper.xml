@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.xs.chat.mapper.ChatRoomMemberMapper">
+
+    <select id="selectByChatRoomIdAndUserId" resultType="com.xs.chat.pojo.DO.ChatRoomMemberDO">
+        SELECT id, chat_room_id, user_id, role, joined_at, last_read_message_id, is_muted, is_visible
+        FROM chat_room_member
+        WHERE chat_room_id = #{chatRoomId} AND user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <update id="updateLastReadMessageId">
+        UPDATE chat_room_member
+        SET last_read_message_id = #{lastReadMessageId}
+        WHERE chat_room_id = #{chatRoomId} AND user_id = #{userId}
+    </update>
+
+    <insert id="BatchInsert">
+        INSERT INTO chat_room_member
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="list[0].id != null">id,</if>
+            <if test="list[0].chatRoomId != null">chat_room_id,</if>
+            <if test="list[0].userId != null">user_id,</if>
+            <if test="list[0].role != null">role,</if>
+            <if test="list[0].joinedAt != null">joined_at,</if>
+            <if test="list[0].lastReadMessageId != null">last_read_message_id,</if>
+            <if test="list[0].isMuted != null">is_muted,</if>
+            <if test="list[0].isVisible != null">is_visible,</if>
+        </trim>
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="item.id != null">#{item.id},</if>
+                <if test="item.chatRoomId != null">#{item.chatRoomId},</if>
+                <if test="item.userId != null">#{item.userId},</if>
+                <if test="item.role != null">#{item.role},</if>
+                <if test="item.joinedAt != null">#{item.joinedAt},</if>
+                <if test="item.lastReadMessageId != null">#{item.lastReadMessageId},</if>
+                <if test="item.isMuted != null">#{item.isMuted},</if>
+                <if test="item.isVisible != null">#{item.isVisible},</if>
+            </trim>
+        </foreach>
+    </insert>
+
+</mapper>

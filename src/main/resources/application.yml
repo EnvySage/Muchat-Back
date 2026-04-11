@@ -1,0 +1,79 @@
+server:
+  address: 0.0.0.0
+  port: 7090
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+    context-path: /api
+
+spring:
+  profiles:
+    active: dev
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${spring.datasource.url}
+    username: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+  main:
+    banner-mode: off
+  data:
+    redis:
+      host: ${spring.data.redis.host}
+      port: ${spring.data.redis.port}
+      password: ${spring.data.redis.password}
+      timeout: 5000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+  application:
+    name: chat
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps:  false
+
+  # 邮件配置 (SMTP)
+  mail:
+    host: ${spring.mail.host}
+    port: ${spring.mail.port}
+    username: ${spring.mail.username}
+    password: ${spring.mail.password}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+        debug: true
+
+mybatis-plus:
+  global-config:
+    banner: false
+  mapper-locations: classpath*:mapper/*.xml
+  type-aliases-package: com.xs
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: ${jwt.secret}
+  expiration: 259200
+
+aliyun:
+  oss:
+    endpoint: ${aliyun.oss.endpoint}
+    access-key-id: ${aliyun.oss.access-key-id}
+    access-key-secret: ${aliyun.oss.access-key-secret}
+    bucket-name: ${aliyun.oss.bucket-name}
+    sts:
+      endpoint: ${aliyun.oss.sts.endpoint}
+      role-arn: ${aliyun.oss.sts.role-arn}
+      role-session-name: chat-mu
+      token-expiration: 3600
+
+netty:
+  port: 7091

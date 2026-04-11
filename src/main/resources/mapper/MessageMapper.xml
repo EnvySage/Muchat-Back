@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.xs.chat.mapper.MessageMapper">
+
+    <select id="countUnreadMessages" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM message
+        WHERE chat_room_id = #{chatRoomId}
+        AND id > #{lastReadMessageId}
+        AND is_deleted != 1
+    </select>
+
+    <select id="selectLatestMessage" resultType="com.xs.chat.pojo.DO.MessageDO">
+        SELECT id, chat_room_id, sender_id, content, content_type, sent_at, is_deleted
+        FROM message
+        WHERE chat_room_id = #{chatRoomId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+</mapper>
