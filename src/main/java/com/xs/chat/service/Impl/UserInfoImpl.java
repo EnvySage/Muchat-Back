@@ -1,9 +1,12 @@
 package com.xs.chat.service.Impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.xs.chat.Utils.CheckCodeUtil;
 import com.xs.chat.Utils.JWTUtils;
 import com.xs.chat.Utils.StringUtil;
+import com.xs.chat.mapper.ChatRoomMemberMapper;
 import com.xs.chat.mapper.UserInfoMapper;
+import com.xs.chat.pojo.DO.ChatRoomMemberDO;
 import com.xs.chat.pojo.DO.UserDO;
 import com.xs.chat.pojo.DTO.UserDTO;
 import com.xs.chat.pojo.VO.UserVO;
@@ -22,6 +25,8 @@ public class UserInfoImpl implements UserInfoService {
     @Autowired
     private UserInfoMapper userInfoMapper;
     @Autowired
+    private ChatRoomMemberMapper chatRoomMemberMapper;
+    @Autowired
     private JWTUtils jwtUtils;
     @Override
     public void register(UserDTO userDTO) {
@@ -29,13 +34,17 @@ public class UserInfoImpl implements UserInfoService {
         BeanUtils.copyProperties(userDTO, userDO);
         userDO.setId(StringUtil.generateUUID());
         userDO.setPasswordHash(StringUtil.encodeHash(userDTO.getPassword()));
-        userDO.setAvatar("https://muyun-music.oss-cn-shenzhen.aliyuncs.com/user-avatar/xs.jpg");
+        userDO.setAvatar("https://chat-mu.oss-cn-shenzhen.aliyuncs.com/xs.jpg");
         userDO.setCreatedAt(LocalDateTime.now());
         userDO.setUpdatedAt(LocalDateTime.now());
         userDO.setLastLoginAt(LocalDate.now());
         userDO.setStatus(1);
         userDO.setOnlineStatus(0);
         userInfoMapper.insertUserInfo(userDO);
+        ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
+        chatRoomMemberDO.setChatRoomId(1L);
+        chatRoomMemberDO.setUserId(userDO.getId());
+        chatRoomMemberMapper.insert(chatRoomMemberDO);
     }
 
     @Override
@@ -61,6 +70,14 @@ public class UserInfoImpl implements UserInfoService {
 
     @Override
     public boolean updateUserInfo(UserDO user) {
+        LambdaQueryWrapper<UserDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserDO::getNickname,user.getNickname());
+        queryWrapper.ne(UserDO::getId,user.getId());
+        boolean flag = userInfoMapper.exists(queryWrapper);
+        if (flag){
+            log.info("昵称已被占用，userId:{}", user.getId());
+            return false;
+        }
         int row = userInfoMapper.updateUserInfo(user);
         if (row > 0) {
             log.info("更新用户信息成功，userId:{}", user.getId());

@@ -108,6 +108,22 @@ public class ChatRoomController {
         if (!flag) return Result.error("批量禁言操作失败");
         return Result.success(chatRoomMemberDTO.getIsMuted() == 1 ? "禁言成功" : "解禁成功");
     }
+    @RequirePermission(GroupPermissionEnum.DISSOLVE_GROUP)
+    @GlobalInterceptor(checkParams = true)
+    @DeleteMapping("/dismissRoom/{chatRoomId}")
+    public Result<String> dismissRoom(@PathVariable Long chatRoomId){
+        boolean flag =chatRoomService.dismissRoom(chatRoomId);
+        if (!flag) return Result.error("解散群聊失败");
+        return Result.success("解散群聊成功");
+    }
 
-
+    @RequirePermission(GroupPermissionEnum.MANAGE_ADMIN)
+    @GlobalInterceptor(checkParams = true)
+    @PutMapping("/changeAdmin")
+    public Result<String> changeAdmin(@RequestBody ChatRoomMemberDTO chatRoomMemberDTO){
+        log.info("changeAdmin:{}",chatRoomMemberDTO);
+        boolean flag = chatRoomService.changeAdmin(chatRoomMemberDTO);
+        if (!flag) return Result.error(chatRoomMemberDTO.getIsAdmin() == 1 ? "设置管理员失败" : "取消管理员失败");
+        return Result.success(chatRoomMemberDTO.getIsAdmin() == 1 ? "设置管理员成功" : "取消管理员成功");
+    }
 }

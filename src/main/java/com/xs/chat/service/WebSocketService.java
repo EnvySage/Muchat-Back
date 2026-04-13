@@ -13,4 +13,12 @@ public interface WebSocketService {
 
     void updateOnlineBroadcast();
     void groupCreatedBroadcast(ChatRoomVO chatRoomVO);
+
+    /**
+     * 群权限/成员变更广播，推送给群内在线成员
+     * @param chatRoomId 群聊ID
+     * @param action 变更类型（如 KICK、MUTE、UNMUTE、ADMIN_ADD、ADMIN_REMOVE、GROUP_INFO_UPDATE、DISMISS）
+     * @param data 变更数据（JSON字符串）
+     */
+    void groupPermissionBroadcast(Long chatRoomId, String action, String data);
 }

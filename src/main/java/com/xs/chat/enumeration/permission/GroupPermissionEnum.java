@@ -7,8 +7,7 @@ public enum GroupPermissionEnum {
     // ===== 群主权限 =====
     DISSOLVE_GROUP("DISSOLVE_GROUP", "解散群聊"),
     TRANSFER_OWNER("TRANSFER_OWNER", "转让群主"),
-    SET_ADMIN("SET_ADMIN", "设置管理员"),
-    REMOVE_ADMIN("REMOVE_ADMIN", "取消管理员"),
+    MANAGE_ADMIN("MANAGE_ADMIN", "设置/取消管理员"),
     // ===== 管理权限 =====
     KICK_MEMBER("KICK_MEMBER", "踢出成员"),
     MUTE_MEMBER("MUTE_MEMBER", "禁言/解禁成员"),

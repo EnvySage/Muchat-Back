@@ -26,8 +26,8 @@ public class OssController {
     /**
      * 获取OSS上传凭证（STS临时凭证，供前端直传）
      * 需要在请求头携带 Authorization: Bearer <token>
-     * @param type 上传类型：user-avatar(用户头像)、group-avatar(群头像)
-     * @param targetId 上传目标ID（type=group-avatar时传入群聊ID）
+     * @param type 上传类型：user-avatar(用户头像)、group-avatar(群头像)、chat-file(聊天文件/图片)
+     * @param targetId 上传目标ID（type=group-avatar时传入群聊ID；type=chat-file时传入chatRoomId）
      * @return STS凭证信息
      */
     @GetMapping("/getOssToken")
@@ -45,6 +45,12 @@ public class OssController {
             }
             case "user-avatar" -> {
                 folder = "user-avatar/" + userId;
+            }
+            case "chat-file" -> {
+                if (targetId == null || targetId.isEmpty()) {
+                    return Result.error("聊天文件上传需要提供群聊ID");
+                }
+                folder = "chat/" + targetId;
             }
             default -> {
                 return Result.error("不支持的上传类型: " + type);

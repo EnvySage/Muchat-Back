@@ -1,12 +1,16 @@
 package com.xs.chat.service.Impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
+import cn.hutool.json.JSONUtil;
 import com.xs.chat.Exception.BusinessException;
 import com.xs.chat.context.BaseContext;
 import com.xs.chat.enumeration.ChatRoomEnum;
 import com.xs.chat.enumeration.ResponseCodeEnum;
 import com.xs.chat.enumeration.permission.GroupRoleEnum;
 import com.xs.chat.event.GroupCreatedEvent;
+import com.xs.chat.event.GroupPermissionUpdateEvent;
 import com.xs.chat.mapper.ChatRoomMapper;
 import com.xs.chat.mapper.ChatRoomMemberMapper;
 import com.xs.chat.mapper.MessageMapper;
@@ -239,6 +243,9 @@ public class ChatRoomImpl implements ChatRoomService {
             return chatRoomMemberDO;
         }).collect(Collectors.toList());
         chatRoomMemberMapper.BatchInsert(chatRoomMemberDOList);
+        // 广播邀请入群通知
+        applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomMemberDTO.getChatRoomId(), "INVITE",
+                "{\"userIds\":" + JSONUtil.toJsonStr(chatRoomMemberDTO.getUserIdList()) + "}"));
         log.info("inviteGroup:{}",chatRoomMemberDTO);
     }
 
@@ -292,6 +299,9 @@ public class ChatRoomImpl implements ChatRoomService {
             for (String targetUserId : targetUserIds) {
                 permissionService.cleanRoleCache(chatRoomId, targetUserId);
             }
+            // 广播踢人通知
+            applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomId, "KICK",
+                    "{\"userIds\":" + JSONUtil.toJsonStr(targetUserIds) + "}"));
             log.info("kickGroup: 批量踢出成功, chatRoomId={}, targetUserIds={}, count={}", chatRoomId, targetUserIds, rows);
             return true;
         }
@@ -318,6 +328,9 @@ public class ChatRoomImpl implements ChatRoomService {
         chatRoomDO.setId(chatRoomDTO.getChatRoomId());
         int row = chatRoomMapper.updateById(chatRoomDO);
         if (row > 0) {
+            // 广播群信息更新通知
+            applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomDTO.getChatRoomId(), "GROUP_INFO_UPDATE",
+                    JSONUtil.toJsonStr(chatRoomDTO)));
             return true;
         }
         return false;
@@ -372,8 +385,55 @@ public class ChatRoomImpl implements ChatRoomService {
         int rows = chatRoomMemberMapper.update(updateDO, updateWrapper);
 
         if (rows > 0) {
+            // 广播禁言/解禁通知
+            applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomId, isMuted == 1 ? "MUTE" : "UNMUTE",
+                    "{\"userIds\":" + JSONUtil.toJsonStr(targetUserIds) + ",\"isMuted\":" + isMuted + "}"));
             log.info("batchMute: 批量{}成功, chatRoomId={}, targetUserIds={}, count={}",
                     isMuted == 1 ? "禁言" : "解禁", chatRoomId, targetUserIds, rows);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean dismissRoom(Long chatRoomId) {
+        ChatRoomDO chatRoomDO = chatRoomMapper.selectById(chatRoomId);
+        if (chatRoomDO == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600, "聊天室不存在");
+        }
+        chatRoomDO.setIsActive(0);
+        int row = chatRoomMapper.updateById(chatRoomDO);
+        if (row > 0) {
+            // 广播群聊解散通知
+            applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomId, "DISMISS", "{}"));
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean changeAdmin(ChatRoomMemberDTO chatRoomMemberDTO) {
+        Integer isAdmin = chatRoomMemberDTO.getIsAdmin();
+        if (isAdmin == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600, "请指定设置或取消管理员操作");
+        }
+        LambdaUpdateWrapper<ChatRoomMemberDO> queryWrapper = new LambdaUpdateWrapper<>();
+        queryWrapper.eq(ChatRoomMemberDO::getChatRoomId, chatRoomMemberDTO.getChatRoomId())
+                .eq(ChatRoomMemberDO::getUserId, chatRoomMemberDTO.getUserId());
+        ChatRoomMemberDO chatRoomMemberDO = chatRoomMemberMapper.selectOne(queryWrapper);
+        if (chatRoomMemberDO == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600, "用户不在群聊中");
+        }
+        queryWrapper.set(ChatRoomMemberDO::getRole, isAdmin == 1 ? GroupRoleEnum.ADMIN.getCode() : GroupRoleEnum.MEMBER.getCode());
+        int row = chatRoomMemberMapper.update(null, queryWrapper);
+        if (row > 0) {
+            permissionService.cleanRoleCache(chatRoomMemberDTO.getChatRoomId(), chatRoomMemberDTO.getUserId());
+            // 广播管理员变更通知
+            applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomMemberDTO.getChatRoomId(),
+                    isAdmin == 1 ? "ADMIN_ADD" : "ADMIN_REMOVE",
+                    "{\"userId\":\"" + chatRoomMemberDTO.getUserId() + "\",\"isAdmin\":" + isAdmin + "}"));
+            log.info("changeAdmin: {}成功, chatRoomId={}, userId={}",
+                    isAdmin == 1 ? "设置管理员" : "取消管理员", chatRoomMemberDTO.getChatRoomId(), chatRoomMemberDTO.getUserId());
             return true;
         }
         return false;

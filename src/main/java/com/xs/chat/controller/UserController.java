@@ -24,7 +24,7 @@ public class UserController {
         BeanUtils.copyProperties(userDTO,userDO);
         userDO.setId(BaseContext.getCurrentId());
         boolean flag = userInfoService.updateUserInfo(userDO);
-        if (!flag) return Result.error("更新失败");
+        if (!flag) return Result.error("更新失败,昵称可能已被占用");
         return Result.success("更新成功");
     }
 

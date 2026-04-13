@@ -28,4 +28,8 @@ public interface ChatRoomService {
     boolean updateRoom(ChatRoomDTO chatRoomDTO);
 
     boolean batchMute(ChatRoomMemberDTO chatRoomMemberDTO);
+
+    boolean dismissRoom(Long chatRoomId);
+
+    boolean changeAdmin(ChatRoomMemberDTO chatRoomMemberDTO);
 }

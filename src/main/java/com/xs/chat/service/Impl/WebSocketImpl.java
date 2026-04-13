@@ -12,6 +12,7 @@ import com.xs.chat.mapper.ChatRoomMapper;
 import com.xs.chat.mapper.ChatRoomMemberMapper;
 import com.xs.chat.mapper.MessageMapper;
 import com.xs.chat.mapper.UserInfoMapper;
+import com.xs.chat.enumeration.MessageContentTypeEnum;
 import com.xs.chat.pojo.DO.ChatRoomDO;
 import com.xs.chat.pojo.DO.ChatRoomMemberDO;
 import com.xs.chat.pojo.DO.MessageDO;
@@ -223,7 +224,7 @@ public class WebSocketImpl implements WebSocketService {
             return;
         }
         //检查禁言
-        ChatRoomMemberDO member = chatRoomMemberMapper.selectByChatRoomIdAndUserId(roomId,userId);
+        ChatRoomMemberDO member = chatRoomMemberMapper.selectByChatRoomIdAndUserId(roomId, userId);
         if (member != null && member.getIsMuted() != null && member.getIsMuted() == 1) {
             Channel channel = USER_CHANNEL_MAP.get(userId);
             if (channel != null) {
@@ -231,20 +232,54 @@ public class WebSocketImpl implements WebSocketService {
             }
             return;
         }
-        applicationEventPublisher.publishEvent(new MessageSentEvent(this, messageDTO));
-        ChannelGroup group = GROUP_CHANNEL_MAP.get(roomId);
-        if (group == null) {
-            return;
+
+        // 校验并填充 contentType
+        String contentType = messageDTO.getContentType();
+        if (contentType == null || contentType.isEmpty()) {
+            messageDTO.setContentType(MessageContentTypeEnum.TEXT.getCode());
+        } else {
+            // 校验 contentType 是否合法
+            MessageContentTypeEnum typeEnum = MessageContentTypeEnum.fromCode(contentType);
+            messageDTO.setContentType(typeEnum.getCode());
+            // 非文本消息必须有 content（URL信息）
+            if (typeEnum != MessageContentTypeEnum.TEXT) {
+                if (messageDTO.getContent() == null || messageDTO.getContent().isEmpty()) {
+                    Channel channel = USER_CHANNEL_MAP.get(userId);
+                    if (channel != null) {
+                        sendMsg(channel, "{\"type\":\"ERROR\",\"content\":\"非文本消息必须包含文件信息\"}");
+                    }
+                    return;
+                }
+            }
         }
+
+        // 填充发送者信息
         messageDTO.setSenderId(userId);
+        UserDO sender = userInfoMapper.selectById(userId);
+        if (sender != null) {
+            messageDTO.setSenderName(sender.getNickname());
+            messageDTO.setSenderAvatar(sender.getAvatar());
+        }
+        messageDTO.setSentAt(System.currentTimeMillis());
+
+        // 发布消息落库事件
+        applicationEventPublisher.publishEvent(new MessageSentEvent(this, messageDTO));
+
+        // 获取消息ID（用于前端消息定位）
         LambdaQueryWrapper<MessageDO> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MessageDO::getChatRoomId, roomId);
         queryWrapper.orderByDesc(MessageDO::getId);
         queryWrapper.last("limit 1");
-        messageDTO.setMessageId(messageMapper.selectOne(queryWrapper).getId());
-        log.info("发送群组消息: {}", JSONUtil.toJsonStr(messageDTO));
-        group.writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(messageDTO)));
+        MessageDO lastMsg = messageMapper.selectOne(queryWrapper);
+        messageDTO.setMessageId(lastMsg != null ? lastMsg.getId() + 1 : 1L);
 
+        // 广播给群内所有在线用户
+        ChannelGroup group = GROUP_CHANNEL_MAP.get(roomId);
+        if (group == null) {
+            return;
+        }
+        log.info("发送群组消息: roomId={}, senderId={}, contentType={}", roomId, userId, messageDTO.getContentType());
+        group.writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(messageDTO)));
     }
     //通知上线
     @Override
@@ -269,6 +304,20 @@ public class WebSocketImpl implements WebSocketService {
                 });
             }
         }));
+    }
+
+    //群权限/成员变更广播
+    @Override
+    public void groupPermissionBroadcast(Long chatRoomId, String action, String data) {
+        ChannelGroup group = GROUP_CHANNEL_MAP.get(chatRoomId);
+        if (group == null || group.isEmpty()) {
+            return;
+        }
+        String msg = "{\"type\":\"GROUP_PERMISSION_UPDATE\",\"chatRoomId\":" + chatRoomId
+                + ",\"action\":\"" + action + "\""
+                + ",\"data\":" + data + "}";
+        log.info("群权限变更广播: chatRoomId={}, action={}", chatRoomId, action);
+        group.writeAndFlush(new TextWebSocketFrame(msg));
     }
 
     private void sendMsg(Channel channel, String msg) {

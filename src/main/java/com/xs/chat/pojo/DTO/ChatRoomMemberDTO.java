@@ -21,4 +21,5 @@ public class ChatRoomMemberDTO {
     private List<String> userIdList;
 
     private Integer isMuted;
+    private Integer isAdmin;
 }

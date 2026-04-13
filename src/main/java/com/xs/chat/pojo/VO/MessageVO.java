@@ -17,5 +17,7 @@ public class MessageVO {
     private String senderAvatar;
     private String content;
     private String contentType;
+    private String fileName;
+    private Long fileSize;
     private Long sentAt;
 }

@@ -17,6 +17,8 @@ public class MessageDO {
     private String senderId;
     private String content;
     private String contentType;
+    private String fileName;
+    private Long fileSize;
     private Long sentAt;
     private Integer isDeleted;
 }

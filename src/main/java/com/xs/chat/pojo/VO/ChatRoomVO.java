@@ -20,6 +20,7 @@ public class ChatRoomVO {
     private String description;
     private String avatarUrl;
     private Integer isPin;
+    private Integer isActive;
     private String lastMessageContent;
     private String lastMessageSenderId;
     private String lastMessageSenderName;
