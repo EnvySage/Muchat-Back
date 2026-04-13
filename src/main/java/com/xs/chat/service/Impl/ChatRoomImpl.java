@@ -7,6 +7,8 @@ import cn.hutool.json.JSONUtil;
 import com.xs.chat.Exception.BusinessException;
 import com.xs.chat.context.BaseContext;
 import com.xs.chat.enumeration.ChatRoomEnum;
+import com.xs.chat.enumeration.NoticeStatusEnum;
+import com.xs.chat.enumeration.NoticeTypeEnum;
 import com.xs.chat.enumeration.ResponseCodeEnum;
 import com.xs.chat.enumeration.permission.GroupRoleEnum;
 import com.xs.chat.event.GroupCreatedEvent;
@@ -18,6 +20,7 @@ import com.xs.chat.mapper.UserInfoMapper;
 import com.xs.chat.pojo.DO.ChatRoomDO;
 import com.xs.chat.pojo.DO.ChatRoomMemberDO;
 import com.xs.chat.pojo.DO.MessageDO;
+import com.xs.chat.pojo.DO.SystemNoticeDO;
 import com.xs.chat.pojo.DO.UserDO;
 import com.xs.chat.pojo.DTO.ChatRoomDTO;
 import com.xs.chat.pojo.DTO.ChatRoomMemberDTO;
@@ -25,6 +28,7 @@ import com.xs.chat.pojo.Result;
 import com.xs.chat.pojo.VO.ChatRoomMemberVO;
 import com.xs.chat.pojo.VO.ChatRoomVO;
 import com.xs.chat.service.ChatRoomService;
+import com.xs.chat.service.NoticeService;
 import com.xs.chat.service.PermissionService;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -36,6 +40,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 @Slf4j
 @Service
@@ -52,6 +57,8 @@ public class ChatRoomImpl implements ChatRoomService {
     private ApplicationEventPublisher applicationEventPublisher;
     @Autowired
     private PermissionService permissionService;
+    @Autowired
+    private NoticeService noticeService;
     @Override
     public void joinRoom(ChatRoomMemberDTO chatRoomMemberDTO) {
         ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
@@ -136,25 +143,53 @@ public class ChatRoomImpl implements ChatRoomService {
         BeanUtils.copyProperties(chatRoomDTO, chatRoomDO);
         chatRoomDO.setCreatorId(BaseContext.getCurrentId());
         chatRoomDO.setCreatedAt(LocalDateTime.now());
-        int row =chatRoomMapper.insert(chatRoomDO);
+        int row = chatRoomMapper.insert(chatRoomDO);
 
-        if (chatRoomDTO.getMemberIdList() != null){
-            batchInsertChatRoomMembers(chatRoomDO.getId(), chatRoomDTO.getMemberIdList());
+        // 创建者自身加入群聊（群主）
+        ChatRoomMemberDO ownerMember = new ChatRoomMemberDO();
+        ownerMember.setChatRoomId(chatRoomDO.getId());
+        ownerMember.setUserId(BaseContext.getCurrentId());
+        ownerMember.setRole(GroupRoleEnum.OWNER.getCode());
+        chatRoomMemberMapper.BatchInsert(List.of(ownerMember));
 
-            ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
-            chatRoomMemberDO.setChatRoomId(chatRoomDO.getId());
-            chatRoomMemberDO.setUserId(BaseContext.getCurrentId());
-            chatRoomMemberDO.setRole(GroupRoleEnum.OWNER.getCode());
-            chatRoomMemberMapper.BatchInsert(List.of(chatRoomMemberDO));
+        if (chatRoomDTO.getMemberIdList() != null && !chatRoomDTO.getMemberIdList().isEmpty()) {
+            String inviterId = BaseContext.getCurrentId();
+            UserDO inviter = userInfoMapper.selectById(inviterId);
+            String inviterName = inviter != null ? inviter.getNickname() : "未知用户";
+
+            for (String userId : chatRoomDTO.getMemberIdList()) {
+                // 创建群邀请通知，被邀请人需同意后才加入
+                SystemNoticeDO notice = new SystemNoticeDO();
+                notice.setReceiverId(userId);
+                notice.setSenderId(inviterId);
+                notice.setType(NoticeTypeEnum.GROUP_INVITE.getCode());
+                notice.setTitle(inviterName + " 邀请你加入群聊 " + chatRoomDO.getName());
+                notice.setRelatedId(String.valueOf(chatRoomDO.getId()));
+                notice.setExtraData(JSONUtil.toJsonStr(Map.of(
+                        "chatRoomName", chatRoomDO.getName() != null ? chatRoomDO.getName() : "",
+                        "chatRoomAvatar", chatRoomDO.getAvatarUrl() != null ? chatRoomDO.getAvatarUrl() : "",
+                        "inviterName", inviterName
+                )));
+                notice.setStatus(NoticeStatusEnum.UNREAD.getCode());
+                notice.setExpiredAt(LocalDateTime.now().plusDays(7));
+                noticeService.sendNotice(notice);
+            }
         }
+
         if (row > 0) {
             ChatRoomVO chatRoomVO = new ChatRoomVO();
             BeanUtils.copyProperties(chatRoomDO, chatRoomVO);
-            applicationEventPublisher.publishEvent(new GroupCreatedEvent(this, chatRoomVO));
-            log.info("createRoom:{}",chatRoomVO);
+            // 填充成员信息（创建者自己）
+            List<ChatRoomMemberVO> memberVOS = getChatRoomMembers(chatRoomDO.getId());
+            chatRoomVO.setMembers(memberVOS);
+            chatRoomVO.setMemberCount(memberVOS.size());
+            chatRoomVO.setIsActive(1);
+            chatRoomVO.setIsPin(0);
+            applicationEventPublisher.publishEvent(new GroupCreatedEvent(this, chatRoomVO, chatRoomDTO.getMemberIdList()));
+            log.info("createRoom:{}", chatRoomVO);
             return chatRoomVO;
-        }else {
-            log.error("createRoom error:{}",chatRoomDTO);
+        } else {
+            log.error("createRoom error:{}", chatRoomDTO);
             return null;
         }
     }
@@ -235,18 +270,40 @@ public class ChatRoomImpl implements ChatRoomService {
 
     @Override
     public void inviteGroup(ChatRoomMemberDTO chatRoomMemberDTO) {
-        List<ChatRoomMemberDO> chatRoomMemberDOList = chatRoomMemberDTO.getUserIdList().stream().map(userId -> {
-            ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
-            chatRoomMemberDO.setChatRoomId(chatRoomMemberDTO.getChatRoomId());
-            chatRoomMemberDO.setUserId(userId);
-            chatRoomMemberDO.setRole(GroupRoleEnum.MEMBER.getCode());
-            return chatRoomMemberDO;
-        }).collect(Collectors.toList());
-        chatRoomMemberMapper.BatchInsert(chatRoomMemberDOList);
-        // 广播邀请入群通知
-        applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomMemberDTO.getChatRoomId(), "INVITE",
-                "{\"userIds\":" + JSONUtil.toJsonStr(chatRoomMemberDTO.getUserIdList()) + "}"));
-        log.info("inviteGroup:{}",chatRoomMemberDTO);
+        Long chatRoomId = chatRoomMemberDTO.getChatRoomId();
+        ChatRoomDO room = chatRoomMapper.selectById(chatRoomId);
+        if (room == null || room.getIsActive() == 0) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600, "群聊不存在或已解散");
+        }
+        String inviterId = BaseContext.getCurrentId();
+        UserDO inviter = userInfoMapper.selectById(inviterId);
+        String inviterName = inviter != null ? inviter.getNickname() : "未知用户";
+
+        for (String userId : chatRoomMemberDTO.getUserIdList()) {
+            // 跳过已在群中的用户
+            ChatRoomMemberDO existing = chatRoomMemberMapper.selectByChatRoomIdAndUserId(chatRoomId, userId);
+            if (existing != null) {
+                log.info("inviteGroup: 用户{}已在群中，跳过", userId);
+                continue;
+            }
+
+            // 创建群邀请通知
+            SystemNoticeDO notice = new SystemNoticeDO();
+            notice.setReceiverId(userId);
+            notice.setSenderId(inviterId);
+            notice.setType(NoticeTypeEnum.GROUP_INVITE.getCode());
+            notice.setTitle(inviterName + " 邀请你加入群聊 " + room.getName());
+            notice.setRelatedId(String.valueOf(chatRoomId));
+            notice.setExtraData(JSONUtil.toJsonStr(Map.of(
+                    "chatRoomName", room.getName() != null ? room.getName() : "",
+                    "chatRoomAvatar", room.getAvatarUrl() != null ? room.getAvatarUrl() : "",
+                    "inviterName", inviterName
+            )));
+            notice.setStatus(NoticeStatusEnum.UNREAD.getCode());
+            notice.setExpiredAt(LocalDateTime.now().plusDays(7));
+            noticeService.sendNotice(notice);
+        }
+        log.info("inviteGroup: 已发送群邀请通知, chatRoomId={}, userIdList={}", chatRoomId, chatRoomMemberDTO.getUserIdList());
     }
 
     @Override
@@ -404,6 +461,8 @@ public class ChatRoomImpl implements ChatRoomService {
         chatRoomDO.setIsActive(0);
         int row = chatRoomMapper.updateById(chatRoomDO);
         if (row > 0) {
+            // 将待处理的群邀请通知设为过期
+            noticeService.expireGroupInvites(chatRoomId);
             // 广播群聊解散通知
             applicationEventPublisher.publishEvent(new GroupPermissionUpdateEvent(this, chatRoomId, "DISMISS", "{}"));
             return true;

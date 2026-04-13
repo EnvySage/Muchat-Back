@@ -294,16 +294,28 @@ public class WebSocketImpl implements WebSocketService {
     //通知群聊创建
     @Override
     public void groupCreatedBroadcast(ChatRoomVO chatRoomVO) {
+        groupCreatedBroadcast(chatRoomVO, null);
+    }
+
+    //通知群聊创建（含被邀请人）
+    @Override
+    public void groupCreatedBroadcast(ChatRoomVO chatRoomVO, List<String> invitedUserIds) {
         LambdaQueryWrapper<ChatRoomMemberDO> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(ChatRoomMemberDO::getChatRoomId, chatRoomVO.getId());
-        List<String> idList = chatRoomMemberMapper.selectList(queryWrapper).stream().map(ChatRoomMemberDO::getUserId).collect(Collectors.toList());
-        USER_CHANNEL_MAP.forEach(((s, channel) -> {
-            if (idList.contains(s)) {
-                executor.execute(() -> {
-                    sendMsg(channel, "{\"type\":\"GROUP_CREATED\",\"chatRoom\":" + JSONUtil.toJsonStr(chatRoomVO) + "}");
-                });
+        List<String> memberIdList = chatRoomMemberMapper.selectList(queryWrapper).stream().map(ChatRoomMemberDO::getUserId).collect(Collectors.toList());
+
+        // 合并群成员和被邀请人
+        Set<String> allUserIds = new java.util.HashSet<>(memberIdList);
+        if (invitedUserIds != null) {
+            allUserIds.addAll(invitedUserIds);
+        }
+
+        String msg = "{\"type\":\"GROUP_CREATED\",\"chatRoom\":" + JSONUtil.toJsonStr(chatRoomVO) + "}";
+        USER_CHANNEL_MAP.forEach((userId, channel) -> {
+            if (allUserIds.contains(userId)) {
+                executor.execute(() -> sendMsg(channel, msg));
             }
-        }));
+        });
     }
 
     //群权限/成员变更广播
@@ -318,6 +330,27 @@ public class WebSocketImpl implements WebSocketService {
                 + ",\"data\":" + data + "}";
         log.info("群权限变更广播: chatRoomId={}, action={}", chatRoomId, action);
         group.writeAndFlush(new TextWebSocketFrame(msg));
+    }
+
+    //推送新通知给指定用户
+    @Override
+    public void sendNoticePush(String receiverId, Long noticeId, String type, String title) {
+        Channel channel = USER_CHANNEL_MAP.get(receiverId);
+        if (channel != null && channel.isActive()) {
+            String msg = "{\"type\":\"NEW_NOTICE\",\"noticeId\":" + noticeId
+                    + ",\"noticeType\":\"" + type + "\""
+                    + ",\"title\":\"" + title.replace("\"", "\\\"") + "\"}";
+            executor.execute(() -> sendMsg(channel, msg));
+        }
+    }
+
+    //向指定在线用户推送消息
+    @Override
+    public void sendToUser(String userId, String message) {
+        Channel channel = USER_CHANNEL_MAP.get(userId);
+        if (channel != null && channel.isActive()) {
+            executor.execute(() -> sendMsg(channel, message));
+        }
     }
 
     private void sendMsg(Channel channel, String msg) {

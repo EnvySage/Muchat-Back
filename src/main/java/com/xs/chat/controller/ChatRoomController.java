@@ -84,7 +84,7 @@ public class ChatRoomController {
         return Result.success("更新群昵称成功");
     }
 
-    @RequirePermission(GroupPermissionEnum.VIEW_MEMBERS)
+    @RequirePermission(GroupPermissionEnum.INVITE_MEMBER)
     @GlobalInterceptor(checkParams = true)
     @PostMapping("/inviteGroup")
     public Result<String> inviteGroup(@RequestBody ChatRoomMemberDTO chatRoomMemberDTO){

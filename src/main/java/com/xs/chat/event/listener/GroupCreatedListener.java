@@ -17,7 +17,7 @@ public class GroupCreatedListener {
     @Async
     @EventListener(classes = GroupCreatedEvent.class)
     public void createGroup(GroupCreatedEvent event){
-        log.info("发送创建群组广播: {}", event.getChatRoomVO());
-        webSocketService.groupCreatedBroadcast(event.getChatRoomVO());
+        log.info("发送创建群组广播: {}, 被邀请人: {}", event.getChatRoomVO(), event.getInvitedUserIds());
+        webSocketService.groupCreatedBroadcast(event.getChatRoomVO(), event.getInvitedUserIds());
     }
 }

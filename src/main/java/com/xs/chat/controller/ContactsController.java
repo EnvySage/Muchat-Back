@@ -1,5 +1,6 @@
 package com.xs.chat.controller;
 
+import com.xs.chat.Annotation.GlobalInterceptor;
 import com.xs.chat.pojo.DTO.ContactsDTO;
 import com.xs.chat.pojo.Result;
 import com.xs.chat.pojo.VO.ContactsVO;
@@ -14,22 +15,27 @@ import java.util.List;
 public class ContactsController {
     @Resource
     private ContactService contactService;
+    @GlobalInterceptor(checkParams = true)
     @GetMapping("/all")
     public Result<List<ContactsVO>> getAllContacts(){
         List<ContactsVO> contactsVOList = contactService.getAllById();
         return Result.success(contactsVOList);
     }
 
-    @PostMapping("/add")
-    public Result<String> addContact(@RequestBody ContactsDTO contactsDTO){
-        contactService.addContact(contactsDTO);
-        return Result.success("添加成功");
+    @GlobalInterceptor(checkParams = true)
+    @PostMapping("/request/{contactId}")
+    public Result<String> sendFriendRequest(@PathVariable("contactId") String contactId){
+        contactService.sendFriendRequest(contactId);
+        return Result.success("好友邀请已发送");
     }
+
+    @GlobalInterceptor(checkParams = true)
     @DeleteMapping("/delete/{contactId}")
     public Result<String> deleteContact(@PathVariable("contactId") String contactId){
         contactService.deleteContact(contactId);
         return Result.success("删除成功");
     }
+    @GlobalInterceptor(checkParams = true)
     @PutMapping("/update")
     public Result<String> updateContact(@RequestBody ContactsDTO contactsDTO){
         boolean flag = contactService.updateContact(contactsDTO);
