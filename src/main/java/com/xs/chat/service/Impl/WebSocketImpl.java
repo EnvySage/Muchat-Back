@@ -113,6 +113,8 @@ public class WebSocketImpl implements WebSocketService {
         }
         Channel oldChannel = USER_CHANNEL_MAP.put(userId, channel);
         if (oldChannel != null && oldChannel.isActive() && oldChannel != channel) {
+            // 先通知旧连接被挤下线
+            sendMsg(oldChannel, "{\"type\":\"KICKED\",\"reason\":\"other_device_login\"}");
             oldChannel.close();
         }
         NettyUtil.setAttr(channel, NettyUtil.ID, userId);

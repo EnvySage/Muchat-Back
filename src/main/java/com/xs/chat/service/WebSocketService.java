@@ -46,4 +46,5 @@ public interface WebSocketService {
      * @param message JSON字符串消息
      */
     void sendToUser(String userId, String message);
+
 }

@@ -10,6 +10,7 @@ import com.xs.chat.pojo.Result;
 import com.xs.chat.pojo.VO.UserVO;
 import com.xs.chat.service.CheckCodeService;
 import com.xs.chat.service.UserInfoService;
+import com.xs.chat.service.WebSocketService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,8 @@ public class AccountController {
     private CheckCodeUtil checkCodeUtil;
     @Autowired
     private JWTUtils jwtUtils;
+    @Autowired
+    private WebSocketService webSocketService;
 
     /**
      * @param response
@@ -123,6 +126,9 @@ public class AccountController {
         log.info("用户登录成功：{}", userVO.getNickname());
         return Result.success(userVO);
     }
+
+
+
     @GlobalInterceptor(checkParams = true)
     @PostMapping("/verifyToken")
     public Result<UserVO> verifyToken(@RequestBody Map<String, String> map) {

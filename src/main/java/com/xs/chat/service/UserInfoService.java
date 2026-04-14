@@ -15,4 +15,5 @@ public interface UserInfoService {
 
     boolean updateUserInfo(UserDO user);
 
+    List<UserVO> searchUsers(String keyword, String currentUserId);
 }

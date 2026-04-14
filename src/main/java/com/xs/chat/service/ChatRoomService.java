@@ -32,4 +32,6 @@ public interface ChatRoomService {
     boolean dismissRoom(Long chatRoomId);
 
     boolean changeAdmin(ChatRoomMemberDTO chatRoomMemberDTO);
+
+    List<ChatRoomVO> searchPublicRooms(String keyword);
 }

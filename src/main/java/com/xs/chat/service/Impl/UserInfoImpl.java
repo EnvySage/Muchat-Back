@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -86,5 +88,22 @@ public class UserInfoImpl implements UserInfoService {
             log.warn("更新用户信息失败，userId:{}", user.getId());
             return false;
         }
+    }
+
+    @Override
+    public List<UserVO> searchUsers(String keyword, String currentUserId) {
+        LambdaQueryWrapper<UserDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.like(UserDO::getNickname, keyword)
+                .ne(UserDO::getId, currentUserId)
+                .last("LIMIT 20");
+        List<UserDO> userDOList = userInfoMapper.selectList(queryWrapper);
+        List<UserVO> userVOList = new ArrayList<>();
+        for (UserDO userDO : userDOList) {
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(userDO, userVO);
+            userVO.setToken(null);
+            userVOList.add(userVO);
+        }
+        return userVOList;
     }
 }

@@ -498,6 +498,23 @@ public class ChatRoomImpl implements ChatRoomService {
         return false;
     }
 
+    @Override
+    public List<ChatRoomVO> searchPublicRooms(String keyword) {
+        LambdaQueryWrapper<ChatRoomDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(ChatRoomDO::getType, ChatRoomEnum.PUBLIC.getCode())
+                .like(ChatRoomDO::getName, keyword)
+                .eq(ChatRoomDO::getIsActive, 1)
+                .last("LIMIT 20");
+        List<ChatRoomDO> chatRoomDOList = chatRoomMapper.selectList(queryWrapper);
+        return chatRoomDOList.stream().map(item -> {
+            ChatRoomVO chatRoomVO = new ChatRoomVO();
+            BeanUtils.copyProperties(item, chatRoomVO);
+            List<ChatRoomMemberVO> memberVOS = getChatRoomMembers(item.getId());
+            chatRoomVO.setMemberCount(memberVOS.size());
+            return chatRoomVO;
+        }).collect(Collectors.toList());
+    }
+
     // 获取聊天室成员列表
     private List<ChatRoomMemberVO> getChatRoomMembers(Long chatRoomId) {
         // 查询聊天室所有成员

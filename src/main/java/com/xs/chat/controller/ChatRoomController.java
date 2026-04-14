@@ -126,4 +126,11 @@ public class ChatRoomController {
         if (!flag) return Result.error(chatRoomMemberDTO.getIsAdmin() == 1 ? "设置管理员失败" : "取消管理员失败");
         return Result.success(chatRoomMemberDTO.getIsAdmin() == 1 ? "设置管理员成功" : "取消管理员成功");
     }
+
+    @GlobalInterceptor(checkParams = true)
+    @GetMapping("/search")
+    public Result<List<ChatRoomVO>> searchPublicRooms(@RequestParam String keyword) {
+        List<ChatRoomVO> chatRoomVOList = chatRoomService.searchPublicRooms(keyword);
+        return Result.success(chatRoomVOList);
+    }
 }
