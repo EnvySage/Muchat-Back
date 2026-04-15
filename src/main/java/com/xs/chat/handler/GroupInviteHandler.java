@@ -65,6 +65,8 @@ public class GroupInviteHandler extends AbstractNoticeHandler {
         member.setChatRoomId(chatRoomId);
         member.setUserId(userId);
         member.setRole(GroupRoleEnum.MEMBER.getCode());
+        UserDO user = userInfoMapper.selectById(userId);
+        member.setRoomName(user != null ? user.getNickname() : "");
         chatRoomMemberMapper.insert(member);
 
         // 清除可能存在的旧角色缓存

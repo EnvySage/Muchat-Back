@@ -64,6 +64,10 @@ public class ChatRoomImpl implements ChatRoomService {
         ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
         BeanUtils.copyProperties(chatRoomMemberDTO,chatRoomMemberDO);
         chatRoomMemberDO.setUserId(BaseContext.getCurrentId());
+        UserDO user = userInfoMapper.selectById(BaseContext.getCurrentId());
+        if (chatRoomMemberDO.getRoomName() == null && user != null) {
+            chatRoomMemberDO.setRoomName(user.getNickname());
+        }
         chatRoomMemberMapper.insert(chatRoomMemberDO);
         log.info("joinRoom:{}",chatRoomMemberDO);
     }
@@ -146,10 +150,12 @@ public class ChatRoomImpl implements ChatRoomService {
         int row = chatRoomMapper.insert(chatRoomDO);
 
         // 创建者自身加入群聊（群主）
+        UserDO creator = userInfoMapper.selectById(BaseContext.getCurrentId());
         ChatRoomMemberDO ownerMember = new ChatRoomMemberDO();
         ownerMember.setChatRoomId(chatRoomDO.getId());
         ownerMember.setUserId(BaseContext.getCurrentId());
         ownerMember.setRole(GroupRoleEnum.OWNER.getCode());
+        ownerMember.setRoomName(creator != null ? creator.getNickname() : "");
         chatRoomMemberMapper.BatchInsert(List.of(ownerMember));
 
         if (chatRoomDTO.getMemberIdList() != null && !chatRoomDTO.getMemberIdList().isEmpty()) {
@@ -198,10 +204,12 @@ public class ChatRoomImpl implements ChatRoomService {
     private void batchInsertChatRoomMembers(Long chatRoomId, List<String> memberIdList) {
         // 创建普通成员列表
         List<ChatRoomMemberDO> chatRoomMemberDOList = memberIdList.stream().map(userId -> {
+            UserDO user = userInfoMapper.selectById(userId);
             ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
             chatRoomMemberDO.setChatRoomId(chatRoomId);
             chatRoomMemberDO.setUserId(userId);
             chatRoomMemberDO.setRole(GroupRoleEnum.MEMBER.getCode());
+            chatRoomMemberDO.setRoomName(user != null ? user.getNickname() : "");
             return chatRoomMemberDO;
         }).collect(Collectors.toList());
         // 批量插入

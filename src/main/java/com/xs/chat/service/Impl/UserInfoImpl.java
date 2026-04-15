@@ -32,6 +32,16 @@ public class UserInfoImpl implements UserInfoService {
     private JWTUtils jwtUtils;
     @Override
     public void register(UserDTO userDTO) {
+        // 检查邮箱是否已注册
+        UserDO existUser = userInfoMapper.selectByEmail(userDTO.getEmail());
+        if (existUser != null) {
+            throw new RuntimeException("该邮箱已被注册");
+        }
+        // 检查昵称是否已存在
+        UserDO existNickname = userInfoMapper.selectByNickname(userDTO.getNickname());
+        if (existNickname != null) {
+            throw new RuntimeException("该昵称已被占用");
+        }
         UserDO userDO = new UserDO();
         BeanUtils.copyProperties(userDTO, userDO);
         userDO.setId(StringUtil.generateUUID());
@@ -46,12 +56,13 @@ public class UserInfoImpl implements UserInfoService {
         ChatRoomMemberDO chatRoomMemberDO = new ChatRoomMemberDO();
         chatRoomMemberDO.setChatRoomId(1L);
         chatRoomMemberDO.setUserId(userDO.getId());
+        chatRoomMemberDO.setRoomName(userDO.getNickname());
         chatRoomMemberMapper.insert(chatRoomMemberDO);
     }
 
     @Override
     public UserVO login(UserDTO userDTO) {
-        UserDO userDO = userInfoMapper.selectByNickname(userDTO.getNickname());
+        UserDO userDO = userInfoMapper.selectByEmail(userDTO.getEmail());
         UserVO userVO = new UserVO();
         if (userDO!=null&&StringUtil.verifyHash(userDTO.getPassword(),userDO.getPasswordHash())){
             BeanUtils.copyProperties(userDO, userVO);
@@ -94,6 +105,8 @@ public class UserInfoImpl implements UserInfoService {
     public List<UserVO> searchUsers(String keyword, String currentUserId) {
         LambdaQueryWrapper<UserDO> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.like(UserDO::getNickname, keyword)
+                .or()
+                .eq(UserDO::getEmail, keyword)
                 .ne(UserDO::getId, currentUserId)
                 .last("LIMIT 20");
         List<UserDO> userDOList = userInfoMapper.selectList(queryWrapper);

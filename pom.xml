@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.0.2</version>
+        <version>3.3.5</version>
         <relativePath/> <!-- 从 Maven 仓库查找父 POM -->
     </parent>
 
@@ -18,11 +18,12 @@
 
     <!-- 统一属性配置 -->
     <properties>
-        <java.version>22</java.version>
+        <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- 第三方依赖版本（仅保留 Spring Boot 未管理的依赖） -->
-        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <mybatis-plus.version>3.5.9</mybatis-plus.version>
+        <mybatis-spring.version>3.0.4</mybatis-spring.version>
         <druid.version>1.2.22</druid.version>
         <aliyun-oss.version>3.17.4</aliyun-oss.version>
         <aliyun-sts.version>1.1.2</aliyun-sts.version>
@@ -71,6 +72,11 @@
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-boot-starter</artifactId>
             <version>${mybatis-plus.version}</version> <!-- 兼容 Spring Boot 3 的版本 -->
+        </dependency>
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis-spring</artifactId>
+            <version>${mybatis-spring.version}</version>
         </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -148,18 +154,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${project.parent.version}</version> <!-- 继承 parent 的版本 -->
                 <configuration>
-                    <mainClass>com.xs.chat.ChatApplication</mainClass> <!-- 你的启动类全路径 -->
-                    <!-- 移除 <skip>true</skip>！！！否则无法生成可执行 Jar -->
+                    <mainClass>com.xs.chat.ChatApplication</mainClass>
                 </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal> <!-- 打包为 Fat Jar -->
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>

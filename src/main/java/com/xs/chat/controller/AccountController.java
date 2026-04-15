@@ -102,9 +102,14 @@ public class AccountController {
     @PostMapping("/register")
     public Result<String> register(@RequestBody UserDTO userDTO) {
         if (checkCodeUtil.verifyEmailCode(userDTO.getEmail(), userDTO.getEmailCode())) {
-            userInfoService.register(userDTO);
-            log.info("用户注册成功：{}", userDTO.getNickname());
-            return Result.success("注册成功");
+            try {
+                userInfoService.register(userDTO);
+                log.info("用户注册成功：{}", userDTO.getNickname());
+                return Result.success("注册成功");
+            } catch (RuntimeException e) {
+                log.info("用户注册失败：{}，原因：{}", userDTO.getNickname(), e.getMessage());
+                return Result.error(e.getMessage());
+            }
         }
         log.info("用户注册失败：{}", userDTO.getNickname());
         return Result.error("注册失败");
@@ -113,7 +118,7 @@ public class AccountController {
     @PostMapping("/login")
     public Result<UserVO> login(@RequestBody UserDTO userDTO, HttpSession session) {
         if (!checkCodeUtil.verifyCheckCode(session,CheckCodeConstant.CHECK_CODE_KEY,userDTO.getLoginCode())){
-            log.info("用户登录失败：{}", userDTO.getNickname());
+            log.info("用户登录失败：{}", userDTO.getEmail());
             return Result.error("验证码错误");
         }
         if (userDTO== null){
@@ -121,7 +126,7 @@ public class AccountController {
         }
         UserVO userVO = userInfoService.login(userDTO);
         if (userVO.getNickname() == null||userVO.getNickname().equals("")){
-            return Result.error("用户密码错误");
+            return Result.error("邮箱或密码错误");
         }
         log.info("用户登录成功：{}", userVO.getNickname());
         return Result.success(userVO);

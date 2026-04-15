@@ -49,7 +49,7 @@ spring:
         smtp:
           socketFactory:
             class: javax.net.ssl.SSLSocketFactory
-        debug: true
+        debug: ${spring.mail.properties.mail.smtp.debug:true}
 
 mybatis-plus:
   global-config:
