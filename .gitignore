@@ -34,3 +34,4 @@ build/
 
 ### 环境配置（含敏感信息） ###
 src/main/resources/application-dev.yml
+src/main/resources/application-prod.yml
